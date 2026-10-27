@@ -9,7 +9,7 @@
 此 repository 管理網站發布流程，應用程式位於 `AnyTagScanner`。
 
 1. 將應用程式更新推送到 `AnyTagScanner/main`。
-2. 本 repo 每小時第 17、47 分鐘檢查來源版本；有新版本時，執行檢查、測試、靜態建置與發布。
+2. 本 repo 每 7 天（台灣時間週一 03:17）檢查來源版本；有新版本時，執行檢查、測試、靜態建置與發布。
 3. 如需立即更新，開啟 [Actions → Publish TagScanner](https://github.com/robin840211/tagscanner/actions/workflows/publish.yml)，按 **Run workflow**，選擇 `main`。
 4. `resolve`、`build`、`deploy` 成功後，開啟網站。版本相同的定時檢查會略過 `build` 與 `deploy`。
 

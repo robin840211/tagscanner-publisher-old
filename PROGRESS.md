@@ -1,5 +1,9 @@
 # Progress
 
+- Weekly schedule verification passed YAML parsing and independent Opus review 21c872f8b70f801371ab491570dc926f (session 43d947e9-aa69-443a-9001-c1348487d56d, observed claude-opus-5-5, gate PASS). Only cron and its README description change; manual/push publication remains available. Source scanner integration is under separate review before both repos are pushed.
+
+- User requested a 7-day cadence with manual immediate publication retained. The publisher schedule is now Sunday 19:17 UTC (Monday 03:17 Asia/Taipei), and documentation matches. Source Dependabot npm and Actions checks are already weekly. Baseline publisher 9940a22; root owns schedule/docs. Pending verification and commit/push alongside scanner update.
+
 - User authorized creating robin840211/tagscanner as a dedicated public publication repository for source robin840211/AnyTagScanner, with final URL https://robin840211.github.io/tagscanner/.
 - Root owns implementation, remote settings and verification; source baseline 75f3ae2. Integration branch main; local checkout D:/GitProject/tagscanner-pages.
 - Pages has been enabled with build_type=workflow and HTTPS before the initial push. Source visibility was verified PUBLIC. Existing source Pages stays intact.
