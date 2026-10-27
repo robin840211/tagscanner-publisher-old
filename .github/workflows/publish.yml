@@ -1,0 +1,132 @@
+name: Publish TagScanner
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  SOURCE_REPOSITORY: robin840211/AnyTagScanner
+  SITE_URL: https://robin840211.github.io/tagscanner/
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+      should_build: ${{ steps.source.outputs.should_build }}
+    steps:
+      - name: Resolve source version
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISHER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          source_sha=$(gh api "repos/$SOURCE_REPOSITORY/commits/main" --jq .sha)
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
+          should_build=true
+          if [[ "$EVENT_NAME" == schedule ]]; then
+            deployed=$(curl --fail --silent --show-error --max-time 30 \
+              "${SITE_URL}build.json?run=${GITHUB_RUN_ID}" || true)
+            if [[ -n "$deployed" ]] && jq -e --arg source "$source_sha" --arg publisher "$PUBLISHER_SHA" \
+              '.source_commit == $source and .publisher_commit == $publisher' \
+              <<< "$deployed" >/dev/null 2>&1; then
+              should_build=false
+            fi
+          fi
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "should_build=$should_build" >> "$GITHUB_OUTPUT"
+          printf 'Source: `%s@%s`\n\nBuild required: `%s`\n' \
+            "$SOURCE_REPOSITORY" "$source_sha" "$should_build" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: read
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      PAGES_BASE_PATH: /tagscanner
+      NEXT_PUBLIC_BASE_PATH: /tagscanner
+      NEXT_PUBLIC_SITE_URL: https://robin840211.github.io/tagscanner/
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          repository: robin840211/AnyTagScanner
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Record published version
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+          PUBLISHER_SHA: ${{ github.sha }}
+        run: |
+          jq -n --arg repository "$SOURCE_REPOSITORY" --arg source "$SOURCE_SHA" \
+            --arg publisher "$PUBLISHER_SHA" --arg built_at "$(date -u +%FT%TZ)" \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{source_repository: $repository, source_commit: $source,
+              publisher_commit: $publisher, built_at: $built_at, workflow_run: $run}' \
+            > out/build.json
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: out
+          include-hidden-files: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
